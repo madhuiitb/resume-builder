@@ -14,7 +14,9 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
-import { enhanceBullet } from "../services/ai-service";
+import { useEnhanceBulletMutation } from "@/store/api/ai-api";
+import { getApiErrorMessage } from "@/store/api/errors";
+
 import type { BulletSuggestion } from "../types/ai";
 
 type Status = "idle" | "loading" | "success" | "error";
@@ -43,46 +45,53 @@ export function AiBulletPopover({
   const [status, setStatus] = useState<Status>("idle");
   const [suggestions, setSuggestions] = useState<BulletSuggestion[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState("");
 
   // Which bullet text the current suggestions were generated for.
   const fetchedForRef = useRef<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const [enhanceBullet] = useEnhanceBulletMutation();
+  const requestRef = useRef<ReturnType<typeof enhanceBullet> | null>(null);
 
   const hasText = currentText.trim().length > 0;
 
   const fetchSuggestions = useCallback(async () => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
+    requestRef.current?.abort();
+
+    const request = enhanceBullet({
+      bulletText: currentText,
+      jobTitle,
+      targetKeywords,
+    });
+    requestRef.current = request;
 
     setStatus("loading");
 
     try {
-      const result = await enhanceBullet(
-        { bulletText: currentText, jobTitle, targetKeywords },
-        controller.signal,
-      );
+      const { suggestions: result } = await request.unwrap();
+
+      // Ignore results from a request that was aborted or replaced.
+      if (requestRef.current !== request) return;
 
       fetchedForRef.current = currentText;
       setSuggestions(result);
       setSelectedId(result[0]?.id ?? null);
       setStatus("success");
     } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        return;
-      }
+      if (requestRef.current !== request) return;
+      setErrorMessage(getApiErrorMessage(error));
       setStatus("error");
     }
-  }, [currentText, jobTitle, targetKeywords]);
+  }, [enhanceBullet, currentText, jobTitle, targetKeywords]);
 
   // Cancel any in-flight request on unmount.
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
 
     if (!open) {
-      abortRef.current?.abort();
+      requestRef.current?.abort();
+      requestRef.current = null;
       if (status === "loading") setStatus("idle");
       return;
     }
@@ -145,7 +154,7 @@ export function AiBulletPopover({
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <div className="space-y-2">
-                <p>We couldn&apos;t generate suggestions. Try again.</p>
+                <p>{errorMessage}</p>
                 <Button
                   type="button"
                   size="xs"
