@@ -7,7 +7,17 @@ import type {
 
 import { mockHandlers } from "./mock-handlers";
 
-/** Mock mode is ON unless NEXT_PUBLIC_USE_MOCK_API is explicitly "false". */
+/**
+ * Endpoints that exist on the real server. Add a URL here when its route
+ * handler is built (Phase 7c adds "/ats/analyze").
+ */
+const LIVE_ENDPOINTS = new Set<string>(["/ai/rewrite"]);
+
+/**
+ * Mock mode is ON unless NEXT_PUBLIC_USE_MOCK_API is explicitly "false".
+ * When off, endpoints in LIVE_ENDPOINTS call the real API and the rest
+ * keep using mocks.
+ */
 const USE_MOCK_API = process.env.NEXT_PUBLIC_USE_MOCK_API !== "false";
 
 const realBaseQuery = fetchBaseQuery({ baseUrl: "/api" });
@@ -32,7 +42,7 @@ export const baseQuery: BaseQueryFn<
   unknown,
   FetchBaseQueryError
 > = async (args, api, extraOptions) => {
-  if (!USE_MOCK_API) {
+  if (!USE_MOCK_API && LIVE_ENDPOINTS.has(args.url)) {
     return realBaseQuery(args, api, extraOptions);
   }
 
