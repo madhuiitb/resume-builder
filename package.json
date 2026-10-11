@@ -12,6 +12,8 @@
     "@base-ui/react": "^1.8.0",
     "@react-pdf/renderer": "^4.9.0",
     "@reduxjs/toolkit": "^2.13.0",
+    "@upstash/ratelimit": "^2.2.0",
+    "@upstash/redis": "^1.39.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "lucide-react": "^1.50.0",

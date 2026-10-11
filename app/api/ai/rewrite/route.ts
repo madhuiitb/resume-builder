@@ -1,5 +1,11 @@
 import { AiConfigError, AiProviderError } from "@/lib/ai/errors";
 import { rewriteBullet } from "@/lib/ai/rewrite-bullet";
+import { getClientIdentity } from "@/lib/redis/identity";
+import {
+  describeDenial,
+  rateLimitHeaders,
+  rateLimitRewrite,
+} from "@/lib/redis/rate-limiter";
 import { parseRewriteRequest } from "@/lib/validation/rewrite-request";
 import type { ApiErrorBody, BulletEnhanceResponse } from "@/types/api";
 
@@ -36,6 +42,13 @@ export async function POST(request: Request) {
     return errorResponse(parsed.error, 400);
   }
 
+  // After validation, so malformed requests never use up anyone's allowance.
+  const decision = await rateLimitRewrite(await getClientIdentity(request));
+  if (!decision.allowed) {
+    const denial = describeDenial(decision);
+    return errorResponse(denial.message, denial.status, denial.headers);
+  }
+
   try {
     const suggestions = await rewriteBullet(parsed.value, {
       signal: AbortSignal.any([
@@ -44,7 +57,9 @@ export async function POST(request: Request) {
       ]),
     });
 
-    return Response.json({ suggestions } satisfies BulletEnhanceResponse);
+    return Response.json({ suggestions } satisfies BulletEnhanceResponse, {
+      headers: rateLimitHeaders(decision),
+    });
   } catch (error) {
     if (error instanceof AiConfigError) {
       // Detail goes to server logs only, never to the browser.
