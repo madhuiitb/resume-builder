@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MobileNav } from "./mobile-nav";
+import { signOutAction } from "@/app/(auth)/actions";
 
 export function AppHeader() {
   return (
@@ -46,7 +47,12 @@ export function AppHeader() {
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem>Sign out</DropdownMenuItem>
+            <DropdownMenuItem
+  onClick={() => signOutAction()}
+>
+  Sign out
+</DropdownMenuItem>
+            
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

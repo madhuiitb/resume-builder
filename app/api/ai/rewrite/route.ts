@@ -8,6 +8,7 @@ import {
 } from "@/lib/redis/rate-limiter";
 import { parseRewriteRequest } from "@/lib/validation/rewrite-request";
 import type { ApiErrorBody, BulletEnhanceResponse } from "@/types/api";
+import { createClient } from "@/lib/supabase/server";
 
 // Upper bound for one request on the hosting platform (seconds).
 export const maxDuration = 30;
@@ -24,6 +25,16 @@ function errorResponse(
 }
 
 export async function POST(request: Request) {
+    const supabase = await createClient();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return errorResponse("Unauthorized. Please sign in.", 401);
+  }
+  
   // Cheap guard before we read the body.
   const declaredLength = Number(request.headers.get("content-length") ?? 0);
   if (declaredLength > MAX_BODY_BYTES) {

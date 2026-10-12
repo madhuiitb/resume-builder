@@ -30,9 +30,13 @@ export function createGeminiProvider(apiKey: string, model: string): AiProvider 
       });
 
       if (!res.ok) {
+        // Google's error body explains the problem (wrong model, bad key...).
+        // It goes to the SERVER log only; the route never sends it to the browser.
+        const detail = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 300);
+
         throw new AiProviderError(
           res.status === 429 ? "rate_limited" : "upstream",
-          `Gemini responded with HTTP ${res.status}`,
+          `Gemini responded with HTTP ${res.status} for model "${model}": ${detail}`,
           res.status,
         );
       }
